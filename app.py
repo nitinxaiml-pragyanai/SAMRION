@@ -20,7 +20,7 @@ st.set_page_config(
 )
 
 # =========================================================
-# 2. PHASE ♾️ ULTRA CINEMATIC CSS
+# 2. PHASE ♾️ ULTRA CINEMATIC CSS (FIXED CONTRAST)
 # =========================================================
 st.markdown("""
 <style>
@@ -43,17 +43,15 @@ h1,h2,h3 {
     letter-spacing: 2px;
 }
 
-/* HERO */
-.hero {
-    padding: 90px 30px;
-    border-radius: 36px;
-    background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.01));
-    backdrop-filter: blur(22px);
-    border: 1px solid rgba(255,255,255,0.15);
-    box-shadow: 0 40px 120px rgba(0,0,0,0.7);
-    animation: float 8s ease-in-out infinite;
-    text-align: center;
-    margin-bottom: 40px;
+/* ADMIN DATABASE CARD (FIXED VISIBILITY) */
+.db-card {
+    background-color: #0a0a0a !important; /* PURE BLACK */
+    border: 1px solid #333;
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    color: #fff !important;
+    font-family: monospace;
 }
 
 /* GLASS CARD */
@@ -70,8 +68,7 @@ h1,h2,h3 {
 }
 
 .glass:hover {
-    transform: translateY(-10px) scale(1.025);
-    box-shadow: 0 30px 70px rgba(0,0,0,0.8);
+    transform: translateY(-5px);
     border-color: #00d2ff;
 }
 
@@ -82,21 +79,13 @@ h1,h2,h3 {
     border: 1px dashed rgba(255, 255, 255, 0.2);
 }
 
-/* GRADIENT TEXT */
-.gradient {
-    background: linear-gradient(90deg, #00d2ff, #ff007f);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    font-weight: 800;
-}
-
-/* MANIFESTO TEXT - LONG FORM */
+/* MANIFESTO TEXT */
 .manifesto-body {
     font-size: 1.1rem;
     line-height: 1.8;
     color: #e0e0e0;
     text-align: left;
-    white-space: pre-line; /* Preserves newlines */
+    white-space: pre-line;
 }
 
 /* BUTTONS */
@@ -110,26 +99,14 @@ div.stButton > button {
     text-transform: uppercase;
     transition: all 0.35s ease;
     width: 100%;
-}
-
-div.stButton > button:hover {
-    transform: scale(1.05);
-    box-shadow: 0 0 35px rgba(0,210,255,0.8);
-}
-
-/* INPUTS */
-.stTextInput input {
-    background: rgba(3,10,30,0.9) !important;
-    border-radius: 16px;
-    border: 1px solid rgba(255,255,255,0.18);
-    padding: 14px;
     color: white !important;
 }
 
-@keyframes float {
-    0% { transform: translateY(0); }
-    50% { transform: translateY(-18px); }
-    100% { transform: translateY(0); }
+/* INPUTS (Fixing White Background) */
+.stTextInput input, .stSelectbox div[data-baseweb="select"] > div {
+    background-color: #050510 !important;
+    color: white !important;
+    border: 1px solid #444;
 }
 
 #MainMenu, footer, header { visibility: hidden; }
@@ -137,7 +114,7 @@ div.stButton > button:hover {
 """, unsafe_allow_html=True)
 
 # =========================================================
-# 3. CONTENT MANIFESTOS (FULL LENGTH RESTORED)
+# 3. MANIFESTOS (FULL LENGTH)
 # =========================================================
 MANIFESTO_PRAGYAN = """
 ### 🇮🇳 PRAGYAN: The Awakening of Indian Digital Consciousness
@@ -211,35 +188,36 @@ def get_groq_client():
     except: return None
 
 # =========================================================
-# 5. LOGIC FUNCTIONS
+# 5. LOGIC FUNCTIONS (UPDATED FOR NAMES & EDITING)
 # =========================================================
-# User Management
-def get_user_access(key):
-    try: return db.reference(f"users/{key}").get()
+
+# --- NEW USER STRUCTURE: {"name": "Nitin", "tools": ["MEDHA", "AKRITI"]} ---
+
+def get_user_data(key):
+    try: 
+        data = db.reference(f"users/{key}").get()
+        # Backward Compatibility Fix (Handle old list format vs new dict format)
+        if isinstance(data, list):
+            return {"name": "Unknown", "tools": data}
+        return data # Returns dict or None
     except: return None
 
-def set_user_access(key, tools):
-    db.reference(f"users/{key}").set(tools)
+def set_user_data(key, name, tools):
+    db.reference(f"users/{key}").set({"name": name, "tools": tools})
 
-def delete_user_access(key):
+def delete_user(key):
     db.reference(f"users/{key}").delete()
 
-# Requests & Upgrades
-def add_upgrade_req(user_key, tool, utr):
-    db.reference('upgrades').push({"user": user_key, "tool": tool, "utr": utr, "date": str(datetime.date.today())})
-
-def get_upgrades(): return db.reference('upgrades').get() or {}
-def delete_upgrade(k): db.reference(f'upgrades/{k}').delete()
-
-def add_request(email): db.reference('requests').push({"email": email, "date": str(datetime.date.today())})
-def get_requests(): return db.reference('requests').get() or {}
-def delete_request(k): db.reference(f'requests/{k}').delete()
-
-# Donations (New)
+# Donations
 def add_donation(email, utr, amount):
     db.reference('donations').push({"email": email, "utr": utr, "amount": amount, "date": str(datetime.date.today())})
 
 def get_donations(): return db.reference('donations').get() or {}
+
+# Requests
+def add_request(email): db.reference('requests').push({"email": email, "date": str(datetime.date.today())})
+def get_requests(): return db.reference('requests').get() or {}
+def delete_request(k): db.reference(f'requests/{k}').delete()
 
 def gen_key():
     chars = string.ascii_uppercase + string.digits
@@ -272,13 +250,13 @@ def consult_ai(prompt):
 if "page" not in st.session_state: st.session_state.page = "home"
 if "role" not in st.session_state: st.session_state.role = None
 if "tools" not in st.session_state: st.session_state.tools = []
-if "user_pass" not in st.session_state: st.session_state.user_pass = None
+if "user_name" not in st.session_state: st.session_state.user_name = "User"
 
 def go(p): st.session_state.page = p
 def logout():
     st.session_state.role = None
     st.session_state.tools = []
-    st.session_state.user_pass = None
+    st.session_state.user_name = "User"
     go("home")
 
 TOOLS = {
@@ -306,7 +284,7 @@ if st.session_state.page == "home":
 
     c1, c2, c3 = st.columns([1, 1, 1])
     with c1:
-        if st.button("📖 READ MANIFESTO"): go("about"); st.rerun()
+        if st.button("📖 MANIFESTO"): go("about"); st.rerun()
     with c2:
         if st.button("🔐 ENTER BRIDGE"): go("login"); st.rerun()
     with c3:
@@ -322,7 +300,7 @@ elif st.session_state.page == "about":
     with t2:
         st.markdown(f"<div class='glass'><div class='manifesto-body'>{MANIFESTO_TOOLS}</div></div>", unsafe_allow_html=True)
 
-# --- CONTRIBUTION PAGE (NEW) ---
+# --- CONTRIBUTION PAGE ---
 elif st.session_state.page == "donate":
     if st.button("← RETURN TO BASE"): go("home"); st.rerun()
     
@@ -333,7 +311,7 @@ elif st.session_state.page == "donate":
             <h2 class="gradient">SUPPORT THE REVOLUTION</h2>
             <p>Your contribution directly funds the GPU compute needed for Pragyan.</p>
             <ul>
-                <li><b>₹50</b>: Lifetime Access</li>
+                <li><b>₹50</b>: Lifetime Access (Early Adopter)</li>
                 <li><b>₹500</b>: Founding Member Status</li>
             </ul>
         </div>
@@ -351,9 +329,9 @@ elif st.session_state.page == "donate":
             if d_email and d_utr:
                 add_donation(d_email, d_utr, d_amt)
                 st.balloons()
-                st.success("THANK YOU! We have received your details. Check your email soon.")
+                st.success("THANK YOU! Details Received.")
             else:
-                st.error("Please fill details.")
+                st.error("Please fill all details.")
         st.markdown("</div>", unsafe_allow_html=True)
 
 # --- LOGIN ---
@@ -369,11 +347,11 @@ elif st.session_state.page == "login":
                     st.session_state.role = "admin"
                     go("admin"); st.rerun()
                 else:
-                    user_tools = get_user_access(key)
-                    if user_tools is not None:
+                    u_data = get_user_data(key)
+                    if u_data:
                         st.session_state.role = "user"
-                        st.session_state.user_pass = key
-                        st.session_state.tools = user_tools
+                        st.session_state.user_name = u_data.get('name', 'User')
+                        st.session_state.tools = u_data.get('tools', [])
                         go("hub"); st.rerun()
                     else:
                         st.error("ACCESS DENIED")
@@ -390,7 +368,7 @@ elif st.session_state.page == "login":
 
 # --- HUB (USER) ---
 elif st.session_state.page == "hub":
-    st.markdown("## 💠 SAMRION ARMORY")
+    st.markdown(f"## 💠 WELCOME, {st.session_state.user_name}")
     if st.button("LOGOUT"): logout(); st.rerun()
     st.markdown("---")
     
@@ -412,77 +390,105 @@ elif st.session_state.page == "hub":
             if unlocked:
                 st.markdown(f"<a href='{url}' target='_blank'><button>LAUNCH</button></a>", unsafe_allow_html=True)
             else:
-                with st.expander("🔒 UPGRADE (₹10)"):
-                    utr = st.text_input("UTR #", key=f"u_{i}")
-                    if st.button("REQUEST UNLOCK", key=f"b_{i}"):
-                        add_upgrade_req(st.session_state.user_pass, name, utr)
-                        st.success("Sent!")
+                st.button(f"🔒 LOCKED", key=f"lk_{i}", disabled=True)
 
-# --- ADMIN ---
+# --- ADMIN (UPDATED WITH NAMES & EDITING) ---
 elif st.session_state.page == "admin":
     st.markdown("## 👑 FOUNDER CONSOLE")
     
-    tabs = st.tabs(["🔑 KEYS", "📩 REQUESTS", "💰 DONATIONS", "🤖 SITE MANAGER"])
+    tabs = st.tabs(["🔑 KEY MANAGEMENT", "📩 REQUESTS", "💰 DONATIONS", "🤖 AI"])
     
+    # 1. KEY MANAGEMENT (Fixes White Text & Adds Editing)
     with tabs[0]:
-        c1, c2 = st.columns(2)
+        c1, c2 = st.columns([1, 1.5])
+        
+        # MINT KEY
         with c1:
-            st.markdown("### Mint Key")
-            sel = st.multiselect("Access Rights", ALL_TOOL_NAMES, default=ALL_TOOL_NAMES)
-            if st.button("GENERATE"):
-                k = gen_key()
-                set_user_access(k, sel)
-                st.success(f"KEY: {k}"); st.code(k)
+            st.markdown("### ✨ Mint New Key")
+            new_name = st.text_input("User Name / Alias", placeholder="e.g. Nitin")
+            sel_tools = st.multiselect("Access Rights", ALL_TOOL_NAMES, default=ALL_TOOL_NAMES)
+            
+            if st.button("GENERATE KEY"):
+                if new_name:
+                    k = gen_key()
+                    set_user_data(k, new_name, sel_tools)
+                    st.success(f"Generated for {new_name}: {k}")
+                    st.code(k)
+                    time.sleep(2); st.rerun()
+                else:
+                    st.error("Enter a Name.")
+
+        # EDIT / DELETE USERS
         with c2:
-            st.markdown("### Database")
-            # --- FIX: DELETE BUTTONS & CONTRAST ---
-            users = db.reference('users').get()
-            if users:
-                for k, v in users.items():
-                    c_txt, c_btn = st.columns([3, 1])
-                    with c_txt: st.code(f"{k}: {v}")
-                    with c_btn:
-                        if st.button("❌", key=f"del_{k}", help="Delete User"):
-                            delete_user_access(k)
-                            st.rerun()
+            st.markdown("### 📋 Database (Edit/Delete)")
+            all_users = db.reference('users').get()
+            
+            if all_users:
+                # Select User to Edit
+                user_keys = list(all_users.keys())
+                user_labels = [f"{all_users[k].get('name', 'Unknown')} ({k})" if isinstance(all_users[k], dict) else f"Unknown ({k})" for k in user_keys]
+                
+                selected_idx = st.selectbox("Select User to Edit", range(len(user_keys)), format_func=lambda x: user_labels[x])
+                target_key = user_keys[selected_idx]
+                target_data = all_users[target_key]
+                
+                # Handling old vs new data format
+                current_name = target_data.get('name', 'Unknown') if isinstance(target_data, dict) else "Unknown"
+                current_tools = target_data.get('tools', target_data) if isinstance(target_data, dict) else target_data
+                if not isinstance(current_tools, list): current_tools = []
+                
+                # Edit Form
+                with st.container(border=True):
+                    st.markdown(f"**Editing: {target_key}**")
+                    edit_name = st.text_input("Name", value=current_name, key="ed_nm")
+                    edit_tools = st.multiselect("Tools", ALL_TOOL_NAMES, default=[t for t in current_tools if t in ALL_TOOL_NAMES], key="ed_tls")
+                    
+                    c_save, c_del = st.columns(2)
+                    with c_save:
+                        if st.button("💾 SAVE CHANGES"):
+                            set_user_data(target_key, edit_name, edit_tools)
+                            st.success("Updated!")
+                            time.sleep(1); st.rerun()
+                    with c_del:
+                        if st.button("❌ DELETE USER", type="primary"):
+                            delete_user(target_key)
+                            st.warning("User Deleted.")
+                            time.sleep(1); st.rerun()
             else:
-                st.info("No Users")
+                st.info("No Users Found.")
 
+    # 2. REQUESTS
     with tabs[1]:
-        c_up, c_new = st.columns(2)
-        with c_up:
-            st.markdown("### Upgrades")
-            upgs = get_upgrades()
-            for k,v in upgs.items():
-                with st.expander(f"{v['tool']} | UTR: {v['utr']}"):
-                    if st.button("APPROVE", key=k):
-                        curr = get_user_access(v['user']) or []
-                        if v['tool'] not in curr: curr.append(v['tool'])
-                        set_user_access(v['user'], curr)
-                        delete_upgrade(k)
-                        st.success("Done!")
-                        time.sleep(1); st.rerun()
-        with c_new:
-            st.markdown("### New Users")
-            reqs = get_requests()
-            for k,v in reqs.items():
-                with st.expander(f"{v['email']}"):
-                    grant = st.multiselect("Grant", ALL_TOOL_NAMES, default=ALL_TOOL_NAMES, key=f"g_{k}")
-                    if st.button("CREATE KEY", key=k):
-                        nk = gen_key()
-                        set_user_access(nk, grant)
-                        delete_request(k)
-                        st.success(f"KEY: {nk}")
+        st.markdown("### 📩 Access Requests")
+        reqs = get_requests()
+        for k,v in reqs.items():
+            with st.expander(f"Request: {v['email']}"):
+                grant = st.multiselect("Grant", ALL_TOOL_NAMES, default=ALL_TOOL_NAMES, key=f"g_{k}")
+                req_name = st.text_input("Assign Name", value=v['email'].split('@')[0], key=f"rn_{k}")
+                if st.button("✅ Create Key", key=k):
+                    nk = gen_key()
+                    set_user_data(nk, req_name, grant)
+                    delete_request(k)
+                    st.success(f"Key Sent: {nk}")
 
+    # 3. DONATIONS
     with tabs[2]:
         st.markdown("### 💰 Donation Logs")
         donations = get_donations()
         if donations:
             for k,v in donations.items():
-                st.code(f"EMAIL: {v['email']} | UTR: {v['utr']} | AMT: ₹{v['amount']} | DATE: {v['date']}")
+                # Using HTML for high visibility (Black background)
+                st.markdown(f"""
+                <div class="db-card">
+                    <span style="color:#00d2ff">EMAIL:</span> {v['email']}<br>
+                    <span style="color:#ff007f">AMOUNT:</span> ₹{v['amount']}<br>
+                    <span>UTR:</span> {v['utr']} | <span>DATE:</span> {v['date']}
+                </div>
+                """, unsafe_allow_html=True)
         else:
             st.info("No donations yet.")
 
+    # 4. AI
     with tabs[3]:
         st.markdown("### 🤖 Self-Editing AI")
         prompt = st.chat_input("Command the Site Manager")
