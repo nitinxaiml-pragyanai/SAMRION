@@ -3,9 +3,11 @@ import datetime
 import random
 import string
 import time
+import os
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import db
+from groq import Groq
 
 # ==========================================
 # 1. CONFIGURATION & THEME
@@ -23,102 +25,72 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
     @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
     
-    /* GLOBAL RESET */
     * { font-family: 'Inter', sans-serif; color: white; }
-    
-    /* BACKGROUND */
-    .stApp {
-        background: linear-gradient(135deg, #000428 0%, #004e92 100%);
-        background-attachment: fixed;
-    }
-
-    /* HEADERS */
+    .stApp { background: linear-gradient(135deg, #000428 0%, #004e92 100%); background-attachment: fixed; }
     h1, h2, h3 { font-family: 'Outfit', sans-serif !important; }
-
-    /* GLASS CARDS */
-    .glass-card {
-        background: rgba(255, 255, 255, 0.05);
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 20px;
-        padding: 30px;
-        margin-bottom: 20px;
-        transition: 0.3s;
-    }
-    .glass-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-        border-color: #00d2ff;
-    }
-
-    /* LOCKED CARD STYLE */
-    .locked-card {
-        opacity: 0.6;
-        border: 1px dashed rgba(255, 100, 100, 0.3);
-        filter: grayscale(0.8);
-    }
-
-    /* INPUTS */
-    .stTextInput > div > div > input {
-        background: rgba(0, 0, 0, 0.5); border: 1px solid #444; color: white; border-radius: 10px;
-    }
-
-    /* BUTTONS */
-    div.stButton > button {
-        background: linear-gradient(90deg, #00d2ff, #3a7bd5);
-        border: none; color: white; font-weight: bold; padding: 10px 25px; border-radius: 30px;
-    }
     
-    /* HIDE JUNK */
+    .glass-card {
+        background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; padding: 30px; margin-bottom: 20px;
+    }
+    .locked-card { opacity: 0.6; border: 1px dashed rgba(255, 100, 100, 0.3); filter: grayscale(0.8); }
+    
+    /* INPUTS & BUTTONS */
+    .stTextInput > div > div > input { background: rgba(0, 0, 0, 0.5); border: 1px solid #444; color: white; border-radius: 10px; }
+    div.stButton > button { background: linear-gradient(90deg, #00d2ff, #3a7bd5); border: none; color: white; font-weight: bold; border-radius: 30px; }
     #MainMenu, footer, header {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. FIREBASE CONNECTION
+# 2. FIREBASE & GROQ CONNECTION
 # ==========================================
 ADMIN_PASS = "ilovesamriddhisoni28oct"
 
-# Initialize Firebase safely
+# FIREBASE INIT
 if not firebase_admin._apps:
     try:
         key_dict = dict(st.secrets["firebase"])
         cred = credentials.Certificate(key_dict)
-        
-        if "database_url" in key_dict:
-            db_url = key_dict["database_url"]
-        else:
-            db_url = f"https://{key_dict['project_id']}-default-rtdb.firebaseio.com/"
-            
+        db_url = key_dict.get("database_url", f"https://{key_dict['project_id']}-default-rtdb.firebaseio.com/")
         firebase_admin.initialize_app(cred, {'databaseURL': db_url})
     except Exception as e:
         st.error(f"🔥 FIREBASE ERROR: {e}")
         st.stop()
 
-# --- NEW DATABASE FUNCTIONS ---
+# GROQ INIT (For Site Manager)
+def get_groq_client():
+    try: return Groq(api_key=st.secrets["GROQ_API_KEY"])
+    except: return None
 
+# ==========================================
+# 3. CORE LOGIC (DB & AI)
+# ==========================================
+# --- DATABASE FUNCTIONS ---
 def get_user_access(user_pass):
-    """Checks if user exists and returns their allowed tools"""
     try:
-        # DB Structure: users -> { "USERPASS123": ["MEDHA", "AKRITI"], ... }
         ref = db.reference(f'users/{user_pass}')
-        data = ref.get()
-        return data # Returns list of tools or None
+        return ref.get()
     except: return None
 
 def add_user_with_access(new_pass, allowed_tools):
-    """Save new pass with specific tool access"""
-    ref = db.reference(f'users/{new_pass}')
-    ref.set(allowed_tools)
+    db.reference(f'users/{new_pass}').set(allowed_tools)
 
-def get_all_users():
-    """Get all users for Admin Panel"""
-    ref = db.reference('users')
-    return ref.get() or {}
+def update_user_access(user_pass, new_tool_list):
+    db.reference(f'users/{user_pass}').set(new_tool_list)
+
+def add_upgrade_request(user_pass, tool_name, utr):
+    req = {"user": user_pass, "tool": tool_name, "utr": utr, "date": str(datetime.date.today())}
+    db.reference('upgrades').push(req)
+
+def get_upgrades():
+    return db.reference('upgrades').get() or {}
+
+def delete_upgrade(key):
+    db.reference(f'upgrades/{key}').delete()
 
 def get_requests():
-    ref = db.reference('requests')
-    return ref.get() or {}
+    return db.reference('requests').get() or {}
 
 def add_request(email):
     db.reference('requests').push({"email": email, "date": str(datetime.date.today())})
@@ -127,27 +99,81 @@ def delete_request(key):
     db.reference(f'requests/{key}').delete()
 
 def generate_pass():
-    chars = string.ascii_uppercase + string.digits + "@#&"
+    chars = string.ascii_uppercase + string.digits
     return ''.join(random.choices(chars, k=12))
 
+# --- SITE MANAGER AI FUNCTIONS ---
+def read_source_code():
+    with open(__file__, "r", encoding="utf-8") as f: return f.read()
+
+def write_source_code(new_code):
+    # 1. Backup first
+    with open("app_backup.py", "w", encoding="utf-8") as f:
+        f.write(read_source_code())
+    # 2. Overwrite
+    with open(__file__, "w", encoding="utf-8") as f:
+        f.write(new_code)
+
+def consult_site_manager(instruction):
+    client = get_groq_client()
+    if not client: return "ERROR: Groq API Key Missing"
+    
+    current_code = read_source_code()
+    
+    prompt = f"""
+    You are the 'Site Manager AI' for Samrion Central. 
+    You have FULL CONTROL to edit the Python Streamlit code of this website.
+    
+    CURRENT CODE:
+    ```python
+    {current_code}
+    ```
+    
+    USER INSTRUCTION: "{instruction}"
+    
+    TASK:
+    1. Rewrite the full `app.py` code to implement the instruction.
+    2. Maintain all existing functionality (Firebase, login, styles) unless asked to change.
+    3. Return ONLY the python code inside code blocks.
+    """
+    
+    try:
+        completion = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1
+        )
+        return completion.choices[0].message.content
+    except Exception as e:
+        return f"AI Error: {e}"
+
 # ==========================================
-# 3. SESSION & NAV
+# 4. SESSION & NAVIGATION
 # ==========================================
 if 'page' not in st.session_state: st.session_state.page = "home"
 if 'user_role' not in st.session_state: st.session_state.user_role = None
+if 'user_pass' not in st.session_state: st.session_state.user_pass = None
 if 'allowed_tools' not in st.session_state: st.session_state.allowed_tools = []
 
 def nav_to(page): st.session_state.page = page
 def logout(): 
     st.session_state.user_role = None
+    st.session_state.user_pass = None
     st.session_state.allowed_tools = []
     st.session_state.page = "home"
 
-# TOOL MASTER LIST
+# --- DYNAMIC TOOL LIST (AI CAN EDIT THIS) ---
 ALL_TOOLS = ["MEDHA", "AKRITI", "VANI", "SANGRAH", "CODIQ"]
+TOOL_DETAILS = {
+    "MEDHA": {"desc": "The Brain (Knowledge)", "icon": "🧠", "url": "https://medha-ai.streamlit.app/"},
+    "AKRITI": {"desc": "The Eye (Vision Gen)", "icon": "🎨", "url": "https://akriti.streamlit.app/"},
+    "SANGRAH": {"desc": "The Collector (Mining)", "icon": "📦", "url": "https://sangrah.streamlit.app/"},
+    "VANI": {"desc": "The Voice (Speech)", "icon": "🎙️", "url": "https://vaani-labs.streamlit.app/"},
+    "CODIQ": {"desc": "The Architect (Code)", "icon": "💻", "url": "https://codiq-ai.streamlit.app/"}
+}
 
 # ==========================================
-# 4. PAGES
+# 5. UI PAGES
 # ==========================================
 
 # --- PAGE: HOME ---
@@ -161,177 +187,189 @@ if st.session_state.page == "home":
         st.markdown("### *The Future of Intelligence*")
     
     st.markdown("---")
-    
-    # Hero
     st.markdown("""
     <div class="glass-card" style="text-align: center; padding: 50px;">
-        <h2 style="color: #00d2ff; font-size: 2.5rem;">PRAGYAN AI</h2>
-        <p style="font-size: 1.2rem; color: #ccc;">The Awakening of Digital Consciousness in India.</p>
-        <br>
+        <h2 style="color: #00d2ff;">PRAGYAN AI</h2>
+        <p style="font-size: 1.2rem; color: #ccc;">The Awakening of Digital Consciousness.</p>
     </div>
     """, unsafe_allow_html=True)
     
-    col_a, col_b, col_c = st.columns([1, 1, 1])
-    with col_a:
-        if st.button("📖 READ THE MANIFESTO", use_container_width=True):
-            nav_to("about"); st.rerun()
-    with col_b:
-        if st.button("🔐 ENTER BRIDGE (LOGIN)", use_container_width=True):
-            nav_to("login"); st.rerun()
-    with col_c:
-        if st.button("🤝 CONTRIBUTE (UPI)", use_container_width=True):
-            st.toast("Scroll down for QR Code")
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    c_qr, c_txt = st.columns([1, 2])
-    with c_qr:
-        try: st.image("qr.png", caption="Scan via UPI", width=250)
-        except: st.warning("QR Code Missing")
-    with c_txt:
-        st.markdown("### Support The Mission")
-        st.write("Pragyan is independent. Your contribution fuels the GPU compute needed to train India's First Open Source Model.")
+    c_a, c_b = st.columns(2)
+    with c_a: 
+        if st.button("📖 READ MANIFESTO", use_container_width=True): nav_to("about"); st.rerun()
+    with c_b: 
+        if st.button("🔐 LOGIN BRIDGE", use_container_width=True): nav_to("login"); st.rerun()
 
 # --- PAGE: MANIFESTO ---
 elif st.session_state.page == "about":
-    if st.button("← BACK TO HOME"): nav_to("home"); st.rerun()
-    st.title("📖 THE SAMRION MANIFESTO")
-    st.markdown("---")
-    # (Leaving text content same as previous for brevity)
-    st.info("The full manifesto content is loaded here.")
+    if st.button("← BACK"): nav_to("home"); st.rerun()
+    st.title("📖 SAMRION MANIFESTO")
+    st.info("Vision & Mission Content Loaded Here...") # Placeholder to save tokens, AI preserves this
 
-# --- PAGE: LOGIN BRIDGE (UPDATED) ---
+# --- PAGE: LOGIN ---
 elif st.session_state.page == "login":
-    st.markdown("<br><br>", unsafe_allow_html=True)
-    col_center = st.columns([1, 2, 1])[1]
-    with col_center:
-        st.markdown("<h1 style='text-align: center;'>🔐 THE BRIDGE</h1>", unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
+    col = st.columns([1, 2, 1])[1]
+    with col:
+        st.markdown("<h1 style='text-align: center;'>🔐 BRIDGE</h1>", unsafe_allow_html=True)
         with st.container(border=True):
-            user_input = st.text_input("Enter UserPass / Admin Key", type="password")
-            
+            user_input = st.text_input("Enter Passkey", type="password")
             if st.button("AUTHENTICATE", type="primary", use_container_width=True):
-                # 1. ADMIN CHECK
                 if user_input == ADMIN_PASS:
                     st.session_state.user_role = "admin"
-                    nav_to("admin_panel")
-                    st.toast("👑 Welcome, Founder.", icon="🔓")
-                    time.sleep(1); st.rerun()
-                
-                # 2. USER CHECK (With Specific Access)
+                    nav_to("admin_panel"); st.rerun()
                 else:
-                    access_list = get_user_access(user_input)
-                    if access_list:
+                    access = get_user_access(user_input)
+                    if access is not None:
                         st.session_state.user_role = "user"
-                        st.session_state.allowed_tools = access_list # Store their specific tools
-                        nav_to("hub")
-                        st.toast("✅ Access Granted.", icon="🚀")
-                        time.sleep(1); st.rerun()
+                        st.session_state.user_pass = user_input
+                        st.session_state.allowed_tools = access
+                        nav_to("hub"); st.rerun()
                     else:
-                        st.error("⛔ Invalid or Expired Passkey")
+                        st.error("⛔ Invalid Passkey")
                         st.session_state.show_buy = True
-
-            if st.session_state.get('show_buy'):
-                st.markdown("---")
-                st.warning("Access Denied.")
-                req_email = st.text_input("Enter Email to Buy License")
-                if st.button("📩 Send Request"):
-                    if req_email:
-                        add_request(req_email)
-                        st.success("Request Sent! Admin will contact you.")
             
+            if st.session_state.get('show_buy'):
+                st.warning("Access Denied.")
+                email = st.text_input("Email for Request")
+                if st.button("📩 Send Request"):
+                    add_request(email)
+                    st.success("Request Sent.")
     if st.button("← Back"): nav_to("home"); st.rerun()
 
-# --- PAGE: THE HUB (SMART LOCKS) ---
-elif st.session_state.page == "hub" and st.session_state.user_role in ["user", "admin"]:
+# --- PAGE: HUB (USER DASHBOARD) ---
+elif st.session_state.page == "hub":
     st.markdown("## 💠 SAMRION AI SUITE")
     if st.button("🔒 LOGOUT"): logout(); st.rerun()
     st.markdown("---")
     
-    # Tool Data
-    tools = [
-        {"name": "MEDHA", "desc": "The Brain (Knowledge)", "icon": "🧠", "url": "https://medha-ai.streamlit.app/"},
-        {"name": "AKRITI", "desc": "The Eye (Vision Gen)", "icon": "🎨", "url": "https://akriti.streamlit.app/"},
-        {"name": "SANGRAH", "desc": "The Collector (Mining)", "icon": "📦", "url": "https://sangrah.streamlit.app/"},
-        {"name": "VANI", "desc": "The Voice (Speech)", "icon": "🎙️", "url": "https://vaani-labs.streamlit.app/"},
-        {"name": "CODIQ", "desc": "The Architect (Code)", "icon": "💻", "url": "https://codiq-ai.streamlit.app/"},
-    ]
-    
-    # Allow Admin to see everything
     my_access = st.session_state.allowed_tools if st.session_state.user_role == "user" else ALL_TOOLS
     
     cols = st.columns(3)
-    for i, tool in enumerate(tools):
-        is_unlocked = tool['name'] in my_access
+    for i, tool_name in enumerate(ALL_TOOLS):
+        tool = TOOL_DETAILS.get(tool_name, {"desc": "New Tool", "icon": "❓", "url": "#"})
+        is_unlocked = tool_name in my_access
         
-        # Style change based on access
         card_class = "glass-card" if is_unlocked else "glass-card locked-card"
-        btn_text = "LAUNCH 🚀" if is_unlocked else "🔒 LOCKED"
-        btn_color = "linear-gradient(90deg, #00d2ff, #3a7bd5)" if is_unlocked else "#444"
         
         with cols[i % 3]:
-            # HTML Card
             st.markdown(f"""
             <div class="{card_class}" style="text-align: center;">
                 <h1>{tool['icon']}</h1>
-                <h3>{tool['name']}</h3>
+                <h3>{tool_name}</h3>
                 <p>{tool['desc']}</p>
             </div>
             """, unsafe_allow_html=True)
             
-            # Logic Button
             if is_unlocked:
-                st.markdown(f"""<a href="{tool['url']}" target="_blank"><button style="background: {btn_color}; border: none; color: white; padding: 10px 20px; border-radius: 20px; cursor: pointer; width: 100%;">{btn_text}</button></a>""", unsafe_allow_html=True)
+                st.markdown(f"""<a href="{tool['url']}" target="_blank"><button style="width:100%; padding:10px; border-radius:20px; border:none; background: linear-gradient(90deg, #00d2ff, #3a7bd5); color:white; font-weight:bold; cursor:pointer;">LAUNCH 🚀</button></a>""", unsafe_allow_html=True)
             else:
-                st.button(f"{btn_text} (Upgrade)", key=f"lock_{i}", disabled=True, use_container_width=True)
+                # UPGRADE LOGIC
+                with st.expander(f"🔒 UPGRADE (₹10)"):
+                    st.caption("Access Restricted.")
+                    st.write("1. Scan QR (Home Page)")
+                    st.write("2. Pay ₹10")
+                    utr = st.text_input("Enter UTR:", key=f"utr_{i}")
+                    if st.button("🚀 REQUEST UNLOCK", key=f"req_{i}"):
+                        if utr:
+                            add_upgrade_request(st.session_state.user_pass, tool_name, utr)
+                            st.success("Upgrade Request Sent!")
+                        else:
+                            st.error("Enter UTR")
 
-# --- PAGE: ADMIN PANEL (TIERED GENERATOR) ---
+# --- PAGE: ADMIN PANEL (THE BRAIN) ---
 elif st.session_state.page == "admin_panel" and st.session_state.user_role == "admin":
-    st.markdown("## 👑 FOUNDER'S CONSOLE")
-    c_l, c_r = st.columns([1, 1])
+    st.title("👑 FOUNDER'S CONSOLE")
     
-    with c_l:
-        st.markdown("### ➕ Generate Key")
-        
-        # NEW: SELECT TOOLS
-        selected_tools = st.multiselect("Select Access Rights", ALL_TOOLS, default=ALL_TOOLS)
-        
-        if st.button("✨ CREATE CUSTOM KEY"):
-            if selected_tools:
-                new_key = generate_pass()
-                add_user_with_access(new_key, selected_tools) # Save Dictionary
-                st.success(f"CREATED: `{new_key}`")
-                st.write(f"Access: {selected_tools}")
-                st.code(new_key)
-            else:
-                st.error("Select at least one tool.")
-            
-        st.markdown("### 📋 Active Keys")
-        users = get_all_users()
-        if users:
-            # Display dict nicely
-            st.json(users, expanded=False)
-        else:
-            st.info("No active keys.")
+    tab_keys, tab_reqs, tab_ai = st.tabs(["🔑 Keys & Users", "📩 Requests & Upgrades", "🤖 Site Manager AI"])
+    
+    # TAB 1: KEYS
+    with tab_keys:
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown("### Generate Key")
+            sel_tools = st.multiselect("Access Rights", ALL_TOOLS, default=ALL_TOOLS)
+            if st.button("✨ CREATE KEY"):
+                nk = generate_pass()
+                add_user_with_access(nk, sel_tools)
+                st.success(f"Key: `{nk}`"); st.code(nk)
+        with c2:
+            st.markdown("### Active Users")
+            st.json(db.reference('users').get())
 
-    with c_r:
-        st.markdown("### 📩 Requests")
-        reqs = get_requests()
-        if reqs:
-            for k, v in reqs.items():
-                with st.expander(f"{v['email']} - {v['date']}"):
-                    # Admin can choose what to give the requester
-                    req_tools = st.multiselect("Grant Access:", ALL_TOOLS, default=ALL_TOOLS, key=f"sel_{k}")
+    # TAB 2: REQUESTS (NEW & UPGRADES)
+    with tab_reqs:
+        col_upg, col_new = st.columns(2)
+        
+        # UPGRADE REQUESTS
+        with col_upg:
+            st.markdown("### 🔼 Upgrade Requests (₹10)")
+            upgrades = get_upgrades()
+            if upgrades:
+                for k, v in upgrades.items():
+                    with st.expander(f"{v['tool']} - UTR: {v['utr']}"):
+                        st.caption(f"User: {v['user']}")
+                        if st.button("✅ Approve Upgrade", key=k):
+                            # Fetch current tools
+                            curr_access = get_user_access(v['user']) or []
+                            if v['tool'] not in curr_access:
+                                curr_access.append(v['tool'])
+                                update_user_access(v['user'], curr_access)
+                            delete_upgrade(k)
+                            st.success("User Upgraded!")
+                            time.sleep(1); st.rerun()
+            else: st.info("No upgrades pending.")
+
+        # NEW USER REQUESTS
+        with col_new:
+            st.markdown("### 📩 New User Requests")
+            reqs = get_requests()
+            if reqs:
+                for k, v in reqs.items():
+                    with st.expander(f"{v['email']}"):
+                        grant_tools = st.multiselect("Tools", ALL_TOOLS, default=ALL_TOOLS, key=f"g_{k}")
+                        if st.button("✅ Create & Send", key=k):
+                            nk = generate_pass()
+                            add_user_with_access(nk, grant_tools)
+                            delete_request(k)
+                            st.success(f"Key Created: {nk}")
+            else: st.info("No new user requests.")
+
+    # TAB 3: SITE MANAGER AI (SELF-EDITING)
+    with tab_ai:
+        st.markdown("### 🤖 Site Manager (Autonomous Admin)")
+        st.caption("Powered by Llama 3.3 (80B Class) via Groq")
+        
+        with st.chat_message("assistant"):
+            st.write("I am the Site Manager. I can add tools, fix bugs, or change the UI. What is your command, Founder?")
+            
+        cmd = st.chat_input("E.g., 'Add a tool named Nexus with url google.com'")
+        
+        if cmd:
+            with st.chat_message("user"): st.write(cmd)
+            
+            with st.spinner("🧠 Analyzing Source Code & Generating Update..."):
+                new_code_raw = consult_site_manager(cmd)
+                
+                # Extract code from markdown blocks
+                if "```python" in new_code_raw:
+                    clean_code = new_code_raw.split("```python")[1].split("```")[0]
                     
-                    if st.button("✅ Approve & Send", key=k):
-                        nk = generate_pass()
-                        add_user_with_access(nk, req_tools)
-                        delete_request(k)
-                        st.success(f"Key: {nk}")
-                        st.write(f"Tools: {req_tools}")
-                        st.code(nk)
-        else: st.info("No pending requests.")
+                    st.success("✅ Code Generated successfully!")
+                    with st.expander("👀 Review Code Change"):
+                        st.code(clean_code, language='python')
+                    
+                    if st.button("💾 APPLY UPDATE TO WEBSITE", type="primary"):
+                        write_source_code(clean_code)
+                        st.toast("SYSTEM UPDATED. REBOOTING...")
+                        time.sleep(2)
+                        st.rerun()
+                else:
+                    st.error("AI failed to generate valid code structure.")
+                    st.write(new_code_raw)
 
     st.markdown("---")
-    if st.button("EXIT ADMIN"): logout(); st.rerun()
+    if st.button("EXIT CONSOLE"): logout(); st.rerun()
 
 else:
     nav_to("home"); st.rerun()
