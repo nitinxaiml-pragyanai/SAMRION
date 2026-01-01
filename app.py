@@ -4,6 +4,7 @@ import random
 import string
 import time
 import os
+import json  # Added for the fix
 import firebase_admin
 from firebase_admin import credentials, db
 from groq import Groq
@@ -19,7 +20,7 @@ st.set_page_config(
 )
 
 # =========================================================
-# 2. PHASE ♾️ ULTRA CINEMATIC CSS (YOUR DESIGN)
+# 2. PHASE ♾️ ULTRA CINEMATIC CSS
 # =========================================================
 st.markdown("""
 <style>
@@ -89,6 +90,14 @@ h1,h2,h3 {
     font-weight: 800;
 }
 
+/* MANIFESTO TEXT */
+.manifesto-body {
+    font-size: 1.1rem;
+    line-height: 1.8;
+    color: #e0e0e0;
+    text-align: left;
+}
+
 /* BUTTONS */
 div.stButton > button {
     background: linear-gradient(90deg, #00d2ff, #0055ff);
@@ -113,7 +122,7 @@ div.stButton > button:hover {
     border-radius: 16px;
     border: 1px solid rgba(255,255,255,0.18);
     padding: 14px;
-    color: white;
+    color: white !important;
 }
 
 @keyframes float {
@@ -127,50 +136,58 @@ div.stButton > button:hover {
 """, unsafe_allow_html=True)
 
 # =========================================================
-# 3. CONTENT MANIFESTOS (EXTRACTED FROM OLD WEBSITE)
+# 3. CONTENT MANIFESTOS (FULL LENGTH)
 # =========================================================
 MANIFESTO_PRAGYAN = """
 ### 🇮🇳 PRAGYAN: The Awakening of Indian Digital Consciousness
 
 **The Mission**
-Pragyan is not just AI; it is a movement. In a world dominated by foreign giants like GPT and Claude, India—the world's largest data consumer—risks becoming a digital colony. **Pragyan exists to change that.**
+Pragyan (meaning "Wisdom" or "Supreme Intelligence" in Sanskrit) is not just another AI model; it is a movement towards digital sovereignty. In a world dominated by foreign AI giants like OpenAI and Google, India—the world's largest data consumer—risks becoming a digital colony. We rely on foreign servers, foreign policies, and foreign algorithms.
+
+Pragyan exists to change that. It is India’s first community-driven, open-source AI project designed to build indigenous intelligence from the ground up.
 
 **The Origin Story**
-Founded by **Nitin Raj** under **Samrion Technologies**, Pragyan was born from a powerful realization: *We cannot build our future on rented land.* No sponsors. No big tech. Just a laptop, a dream, and community support.
+Founded by **Nitin Raj** under the banner of **Samrion Technologies**, Pragyan was born from a simple yet powerful realization: *We cannot build our future on rented land.* Without big corporate sponsors or billion-dollar funding, Pragyan is being built line-by-line, tensor-by-tensor, by an independent developer and a community of believers.
 
-**Why It Matters?**
-* **Data Sovereignty:** Keeping Indian data on Indian servers.
-* **Linguistic Inclusion:** AI that understands the nuance of India's languages.
-* **Transparency:** True Open Source. No black boxes.
+**Why Pragyan Matters?**
+* **Data Sovereignty:** Your data should not leave Indian shores. Pragyan aims to keep Indian data within India.
+* **Linguistic Inclusion:** While Western models focus on English, Pragyan is being trained to understand the nuance of India's diverse languages.
+* **True Open Source:** Unlike "Open" AI companies that keep their weights closed, Pragyan believes in total transparency. Every line of code, every dataset, and every model weight is shared with the people.
 
 **The Roadmap to Ultra**
-1.  **✅ Nano Model (1–10M):** Foundation built. Proof of concept operational.
-2.  **🔄 Mini Model (Current Goal):** Gathering GPU compute for complex reasoning.
-3.  **🚀 Base Model:** The path to India's GPT-Class Intelligence.
+We are climbing the ladder of intelligence:
+1.  **✅ The Nano Model (1–10M Parameters):** The foundation has been laid. The proof of concept is operational.
+2.  **🔄 The Mini Model (Current Goal):** We are currently gathering the GPU compute resources required to train a model capable of complex reasoning.
+3.  **🚀 The Base Model & Beyond:** The ultimate goal is to achieve GPT-Class intelligence that runs on Indian infrastructure.
 """
 
 MANIFESTO_TOOLS = """
 ### 🛠️ THE SAMRION ECOSYSTEM
 
-**🧠 MEDHA (The Brain)**
-*Meaning: Intellect / Wisdom*
-Your personal polymath. Unlike basic bots, Medha understands context, reasons deeply, and speaks Hinglish fluently.
+**1. 🧠 MEDHA (The Brain)**
+*Sanskrit Meaning: Intellect / Wisdom*
+Medha is the intellectual core of the Samrion Ecosystem. It serves as your personal polymath—a digital entity designed not just to answer questions, but to understand context, reason through complex problems, and provide insightful solutions.
+* **Capabilities:** Deep Reasoning, Contextual Memory, Multilingual Fluency.
 
-**🎨 AKRITI (The Imagination)**
-*Meaning: Form / Shape*
-The Visual Reality Engine. From text-to-image generation to remixing reality, Akriti is a complete creative studio for designers.
+**2. 🎨 AKRITI (The Imagination)**
+*Sanskrit Meaning: Form / Shape*
+Akriti is the manifestation of pure imagination. It breaks the barrier between "thought" and "visual." If you can dream it, Akriti can render it. It is not just an image generator; it is a complete creative studio.
+* **Capabilities:** Flux-Realism Generation, Photo Remixing, High-Contrast Designer UI.
 
-**🎙️ VANI (The Voice)**
-*Meaning: Voice / Speech*
-The Neural Voice Ecosystem. Clone voices with God Mode, save them as .SMRV files, and calibrate accents with scientific pangrams.
+**3. 🎙️ VANI (The Voice)**
+*Sanskrit Meaning: Voice / Speech*
+Vani is the voice of the machine. It goes beyond simple text-to-speech by introducing the concept of "Digital Soul." Vani allows users to not only generate speech but to clone, preserve, and transport voices across the digital realm.
+* **Capabilities:** .SMRV Voice Files, God Mode Cloning, Phonetic Calibration.
 
-**📦 SANGRAH (The Collector)**
-*Meaning: Collection / Archive*
-The Infinite Resource Miner. Scrapes 50,000+ images in one session with multi-threaded architecture. Data is the new oil; Sangrah is the rig.
+**4. 📦 SANGRAH (The Collector)**
+*Sanskrit Meaning: Collection / Archive*
+Sangrah is the backbone of machine learning. In the AI age, data is the new oil, and Sangrah is the heavy machinery designed to mine it. It automates the tedious process of dataset collection.
+* **Capabilities:** Industrial Scale Mining (50k+ images), Flash-Speed Downloading, Auto-Zipping.
 
-**💻 CODIQ (The Architect)**
-*Meaning: Coded Intelligence*
-The Builder. Codiq generates full software projects, writes `requirements.txt`, and manages dependencies. It builds the tools that build the future.
+**5. 💻 CODIQ (The Architect)**
+*Sanskrit Meaning: Coded Intelligence*
+Codiq is the builder. It is the most dangerous and powerful tool in the Samrion arsenal because it has the power to create *other* tools. Codiq is not just a code generator; it is a context-aware software engineer.
+* **Capabilities:** Genesis Protocol (Full Projects), Neural Memory, Smart Packaging (.zip).
 """
 
 # =========================================================
@@ -288,13 +305,13 @@ if st.session_state.page == "home":
     
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # Contribution Section (Restored Logic)
+    # Contribution Section
     c_qr, c_txt = st.columns([1, 2])
     with c_qr:
         try: st.image("qr.png", caption="Scan via UPI", width=250)
         except: st.warning("Upload qr.png")
     with c_txt:
-        st.markdown(f"<div class='glass'><h3>🚀 SUPPORT THE MISSION</h3><p>Your contribution funds the GPU compute for Pragyan Mini Model. <br><b>₹50</b> = Lifetime Access to current tools.</p></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='glass'><h3>🚀 SUPPORT THE MISSION</h3><p class='manifesto-body'>Your contribution funds the GPU compute for Pragyan Mini Model. <br><b>₹50</b> = Lifetime Access to current tools.</p></div>", unsafe_allow_html=True)
 
 # --- MANIFESTO ---
 elif st.session_state.page == "about":
@@ -302,9 +319,9 @@ elif st.session_state.page == "about":
     
     t1, t2 = st.tabs(["🇮🇳 PRAGYAN VISION", "🛠️ TOOL ECOSYSTEM"])
     with t1:
-        st.markdown(f"<div class='glass'>{MANIFESTO_PRAGYAN}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='glass'><div class='manifesto-body'>{MANIFESTO_PRAGYAN}</div></div>", unsafe_allow_html=True)
     with t2:
-        st.markdown(f"<div class='glass'>{MANIFESTO_TOOLS}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='glass'><div class='manifesto-body'>{MANIFESTO_TOOLS}</div></div>", unsafe_allow_html=True)
 
 # --- LOGIN ---
 elif st.session_state.page == "login":
@@ -385,7 +402,9 @@ elif st.session_state.page == "admin":
                 st.success(f"KEY: {k}"); st.code(k)
         with c2:
             st.markdown("### Database")
-            st.json(db.reference('users').get())
+            # --- FIX: USE ST.CODE TO FORCE CONTRAST ---
+            user_data = db.reference('users').get()
+            st.code(json.dumps(user_data, indent=2), language='json')
 
     with tabs[1]:
         c_up, c_new = st.columns(2)
