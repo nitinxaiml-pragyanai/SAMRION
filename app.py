@@ -11,8 +11,8 @@ from groq import Groq
 # 1. PAGE CONFIGURATION
 # =========================================================
 st.set_page_config(
-    page_title="SAMRION CENTRAL",
-    page_icon="👑",
+    page_title="SAMRION ",
+    page_icon="♾️",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -315,7 +315,7 @@ elif st.session_state.page == "donate":
     if st.button("← RETURN"): go("home"); st.rerun()
     c1, c2 = st.columns(2)
     with c1:
-        st.markdown("<div class='glass'><h3>🚀 Support The Mission</h3><p style='font-size:18px'>Funds go directly to GPU compute.<br><b>₹50 = Lifetime Access</b></p></div>", unsafe_allow_html=True)
+        st.markdown("<div class='glass'><h3>🚀 Support The Mission</h3><p style='font-size:18px'>Funds go directly to GPU compute.<br><b>Fund India's Future</b></p></div>", unsafe_allow_html=True)
         try: st.image("qr.png", width=350)
         except: st.warning("Please upload qr.png")
     with c2:
