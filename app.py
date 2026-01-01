@@ -4,7 +4,7 @@ import random
 import string
 import time
 import os
-import json  # Added for the fix
+import json
 import firebase_admin
 from firebase_admin import credentials, db
 from groq import Groq
@@ -90,12 +90,13 @@ h1,h2,h3 {
     font-weight: 800;
 }
 
-/* MANIFESTO TEXT */
+/* MANIFESTO TEXT - LONG FORM */
 .manifesto-body {
     font-size: 1.1rem;
     line-height: 1.8;
     color: #e0e0e0;
     text-align: left;
+    white-space: pre-line; /* Preserves newlines */
 }
 
 /* BUTTONS */
@@ -136,7 +137,7 @@ div.stButton > button:hover {
 """, unsafe_allow_html=True)
 
 # =========================================================
-# 3. CONTENT MANIFESTOS (FULL LENGTH)
+# 3. CONTENT MANIFESTOS (FULL LENGTH RESTORED)
 # =========================================================
 MANIFESTO_PRAGYAN = """
 ### 🇮🇳 PRAGYAN: The Awakening of Indian Digital Consciousness
@@ -195,7 +196,6 @@ Codiq is the builder. It is the most dangerous and powerful tool in the Samrion 
 # =========================================================
 ADMIN_PASS = "ilovesamriddhisoni28oct"
 
-# Initialize Firebase
 if not firebase_admin._apps:
     try:
         key_dict = dict(st.secrets["firebase"])
@@ -206,7 +206,6 @@ if not firebase_admin._apps:
         st.error(f"🔥 DATABASE ERROR: {e}")
         st.stop()
 
-# Initialize Groq (Site Manager)
 def get_groq_client():
     try: return Groq(api_key=st.secrets["GROQ_API_KEY"])
     except: return None
@@ -214,7 +213,7 @@ def get_groq_client():
 # =========================================================
 # 5. LOGIC FUNCTIONS
 # =========================================================
-# Database Ops
+# User Management
 def get_user_access(key):
     try: return db.reference(f"users/{key}").get()
     except: return None
@@ -222,6 +221,10 @@ def get_user_access(key):
 def set_user_access(key, tools):
     db.reference(f"users/{key}").set(tools)
 
+def delete_user_access(key):
+    db.reference(f"users/{key}").delete()
+
+# Requests & Upgrades
 def add_upgrade_req(user_key, tool, utr):
     db.reference('upgrades').push({"user": user_key, "tool": tool, "utr": utr, "date": str(datetime.date.today())})
 
@@ -232,11 +235,17 @@ def add_request(email): db.reference('requests').push({"email": email, "date": s
 def get_requests(): return db.reference('requests').get() or {}
 def delete_request(k): db.reference(f'requests/{k}').delete()
 
+# Donations (New)
+def add_donation(email, utr, amount):
+    db.reference('donations').push({"email": email, "utr": utr, "amount": amount, "date": str(datetime.date.today())})
+
+def get_donations(): return db.reference('donations').get() or {}
+
 def gen_key():
     chars = string.ascii_uppercase + string.digits
     return "".join(random.choices(chars, k=12))
 
-# Site Manager AI Logic
+# Site Manager AI
 def read_code():
     with open(__file__, "r", encoding="utf-8") as f: return f.read()
 
@@ -301,17 +310,7 @@ if st.session_state.page == "home":
     with c2:
         if st.button("🔐 ENTER BRIDGE"): go("login"); st.rerun()
     with c3:
-        if st.button("🤝 CONTRIBUTE"): st.toast("See QR Below")
-    
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    # Contribution Section
-    c_qr, c_txt = st.columns([1, 2])
-    with c_qr:
-        try: st.image("qr.png", caption="Scan via UPI", width=250)
-        except: st.warning("Upload qr.png")
-    with c_txt:
-        st.markdown(f"<div class='glass'><h3>🚀 SUPPORT THE MISSION</h3><p class='manifesto-body'>Your contribution funds the GPU compute for Pragyan Mini Model. <br><b>₹50</b> = Lifetime Access to current tools.</p></div>", unsafe_allow_html=True)
+        if st.button("🤝 CONTRIBUTE"): go("donate"); st.rerun()
 
 # --- MANIFESTO ---
 elif st.session_state.page == "about":
@@ -322,6 +321,40 @@ elif st.session_state.page == "about":
         st.markdown(f"<div class='glass'><div class='manifesto-body'>{MANIFESTO_PRAGYAN}</div></div>", unsafe_allow_html=True)
     with t2:
         st.markdown(f"<div class='glass'><div class='manifesto-body'>{MANIFESTO_TOOLS}</div></div>", unsafe_allow_html=True)
+
+# --- CONTRIBUTION PAGE (NEW) ---
+elif st.session_state.page == "donate":
+    if st.button("← RETURN TO BASE"): go("home"); st.rerun()
+    
+    c1, c2 = st.columns([1, 1])
+    with c1:
+        st.markdown("""
+        <div class="glass">
+            <h2 class="gradient">SUPPORT THE REVOLUTION</h2>
+            <p>Your contribution directly funds the GPU compute needed for Pragyan.</p>
+            <ul>
+                <li><b>₹50</b>: Lifetime Access</li>
+                <li><b>₹500</b>: Founding Member Status</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+        try: st.image("qr.png", caption="Scan via UPI", width=300)
+        except: st.warning("Upload qr.png")
+        
+    with c2:
+        st.markdown("<div class='glass'><h3>LOG YOUR CONTRIBUTION</h3>", unsafe_allow_html=True)
+        d_email = st.text_input("Your Email Address")
+        d_utr = st.text_input("UPI Reference ID (UTR)")
+        d_amt = st.number_input("Amount (₹)", min_value=10, value=50)
+        
+        if st.button("✅ CONFIRM DONATION"):
+            if d_email and d_utr:
+                add_donation(d_email, d_utr, d_amt)
+                st.balloons()
+                st.success("THANK YOU! We have received your details. Check your email soon.")
+            else:
+                st.error("Please fill details.")
+        st.markdown("</div>", unsafe_allow_html=True)
 
 # --- LOGIN ---
 elif st.session_state.page == "login":
@@ -389,7 +422,7 @@ elif st.session_state.page == "hub":
 elif st.session_state.page == "admin":
     st.markdown("## 👑 FOUNDER CONSOLE")
     
-    tabs = st.tabs(["🔑 KEYS", "📩 REQUESTS", "🤖 SITE MANAGER"])
+    tabs = st.tabs(["🔑 KEYS", "📩 REQUESTS", "💰 DONATIONS", "🤖 SITE MANAGER"])
     
     with tabs[0]:
         c1, c2 = st.columns(2)
@@ -402,9 +435,18 @@ elif st.session_state.page == "admin":
                 st.success(f"KEY: {k}"); st.code(k)
         with c2:
             st.markdown("### Database")
-            # --- FIX: USE ST.CODE TO FORCE CONTRAST ---
-            user_data = db.reference('users').get()
-            st.code(json.dumps(user_data, indent=2), language='json')
+            # --- FIX: DELETE BUTTONS & CONTRAST ---
+            users = db.reference('users').get()
+            if users:
+                for k, v in users.items():
+                    c_txt, c_btn = st.columns([3, 1])
+                    with c_txt: st.code(f"{k}: {v}")
+                    with c_btn:
+                        if st.button("❌", key=f"del_{k}", help="Delete User"):
+                            delete_user_access(k)
+                            st.rerun()
+            else:
+                st.info("No Users")
 
     with tabs[1]:
         c_up, c_new = st.columns(2)
@@ -433,8 +475,17 @@ elif st.session_state.page == "admin":
                         st.success(f"KEY: {nk}")
 
     with tabs[2]:
+        st.markdown("### 💰 Donation Logs")
+        donations = get_donations()
+        if donations:
+            for k,v in donations.items():
+                st.code(f"EMAIL: {v['email']} | UTR: {v['utr']} | AMT: ₹{v['amount']} | DATE: {v['date']}")
+        else:
+            st.info("No donations yet.")
+
+    with tabs[3]:
         st.markdown("### 🤖 Self-Editing AI")
-        prompt = st.chat_input("Command the Site Manager (e.g., 'Change background color')")
+        prompt = st.chat_input("Command the Site Manager")
         if prompt:
             with st.spinner("Rewriting Code..."):
                 res = consult_ai(prompt)
