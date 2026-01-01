@@ -3,7 +3,6 @@ import datetime
 import random
 import string
 import time
-import os
 import firebase_admin
 from firebase_admin import credentials, db
 from groq import Groq
@@ -26,9 +25,9 @@ st.markdown("""
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap');
 
-/* FORCE DARK THEME RESET */
+/* FORCE DARK THEME & RESET */
 [data-testid="stAppViewContainer"] {
-    background: radial-gradient(circle at 50% 10%, #1a1a2e 0%, #000000 100%);
+    background: radial-gradient(circle at 50% 10%, #0f172a 0%, #000000 100%);
     color: white;
 }
 
@@ -42,11 +41,11 @@ h1, h2, h3 {
     color: white !important;
 }
 
-/* INPUT FIELDS - FORCE VISIBILITY */
-.stTextInput input, .stNumberInput input {
+/* INPUT FIELDS - FORCE PITCH BLACK BACKGROUND WITH WHITE TEXT */
+.stTextInput input, .stNumberInput input, .stSelectbox div[data-baseweb="select"] > div {
     background-color: #000000 !important;
     color: #ffffff !important;
-    border: 2px solid #333 !important;
+    border: 1px solid #333 !important;
     border-radius: 12px !important;
     padding: 15px !important;
     font-size: 16px !important;
@@ -55,53 +54,70 @@ h1, h2, h3 {
     border-color: #00d2ff !important;
     box-shadow: 0 0 10px rgba(0, 210, 255, 0.5);
 }
-label { color: #ccc !important; font-size: 14px !important; }
+/* Label Color */
+.stTextInput label, .stNumberInput label, .stSelectbox label {
+    color: #00d2ff !important;
+    font-size: 14px !important;
+    font-weight: bold !important;
+}
 
-/* CUSTOM LAUNCH BUTTON (NO MORE WHITE BOX) */
-.launch-btn {
+/* CUSTOM NEON BUTTONS (REPLACING STREAMLIT BUTTONS) */
+.custom-btn {
     display: block;
     width: 100%;
-    padding: 15px;
+    padding: 18px;
     background: linear-gradient(90deg, #00d2ff, #0055ff);
     color: white !important;
     text-align: center;
     text-decoration: none;
     font-weight: 800;
+    font-size: 18px;
     border-radius: 50px;
-    margin-top: 15px;
+    margin-top: 10px;
+    margin-bottom: 10px;
     box-shadow: 0 4px 15px rgba(0, 210, 255, 0.4);
+    border: 2px solid rgba(255,255,255,0.1);
     transition: transform 0.2s;
+    cursor: pointer;
 }
-.launch-btn:hover {
-    transform: scale(1.05);
+.custom-btn:hover {
+    transform: scale(1.02);
     box-shadow: 0 0 30px rgba(0, 210, 255, 0.8);
     color: white !important;
+    text-decoration: none;
+}
+
+/* RED DANGER BUTTON */
+.danger-btn {
+    background: linear-gradient(90deg, #ff007f, #990033);
+    box-shadow: 0 4px 15px rgba(255, 0, 127, 0.4);
 }
 
 /* MANIFESTO TYPOGRAPHY - HUGE & CLEAR */
 .manifesto-box {
-    background: rgba(255,255,255,0.05);
+    background: rgba(0,0,0,0.6);
     padding: 40px;
     border-radius: 20px;
-    border-left: 5px solid #ff007f;
+    border: 1px solid #333;
     margin-bottom: 30px;
 }
 .manifesto-title {
-    font-size: 28px;
+    font-size: 32px;
     font-weight: 800;
     color: #00d2ff;
-    margin-bottom: 20px;
+    margin-bottom: 25px;
+    text-transform: uppercase;
 }
 .manifesto-text {
-    font-size: 18px; /* BIG TEXT */
+    font-size: 20px; /* BIG TEXT */
     line-height: 1.8;
     color: #e0e0e0;
-    margin-bottom: 15px;
+    margin-bottom: 20px;
 }
 
 /* GLASS CARD */
 .glass {
-    background: rgba(255,255,255,0.05);
+    background: rgba(255,255,255,0.03);
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255,255,255,0.1);
     border-radius: 20px;
@@ -111,14 +127,25 @@ label { color: #ccc !important; font-size: 14px !important; }
 
 /* ADMIN LIST ITEM */
 .admin-item {
+    background: #050505;
+    padding: 20px;
+    border-radius: 15px;
+    margin-bottom: 15px;
+    border-left: 5px solid #00d2ff;
+    border-top: 1px solid #222;
+}
+
+/* STREAMLIT BUTTON OVERRIDE (For Form Submit Buttons) */
+div.stButton > button {
     background: #111;
-    padding: 15px;
-    border-radius: 10px;
-    margin-bottom: 10px;
-    border-left: 3px solid #00d2ff;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    color: white;
+    border: 1px solid #00d2ff;
+    border-radius: 30px;
+    padding: 10px 25px;
+}
+div.stButton > button:hover {
+    background: #00d2ff;
+    color: black;
 }
 
 /* HIDE JUNK */
@@ -136,6 +163,9 @@ def render_manifesto_pragyan():
         <div class="manifesto-text">
             <b>The Mission</b><br>
             Pragyan (meaning "Wisdom" or "Supreme Intelligence" in Sanskrit) is not just another AI model; it is a movement towards digital sovereignty. In a world dominated by foreign AI giants like OpenAI and Google, India—the world's largest data consumer—risks becoming a digital colony. We rely on foreign servers, foreign policies, and foreign algorithms.
+        </div>
+        <div class="manifesto-text">
+            Pragyan exists to change that. It is India’s first community-driven, open-source AI project designed to build indigenous intelligence from the ground up.
         </div>
         <div class="manifesto-text">
             <b>The Origin Story</b><br>
@@ -158,7 +188,7 @@ def render_manifesto_pragyan():
 
 def render_manifesto_tools():
     st.markdown("""
-    <div class="manifesto-box" style="border-left-color: #00d2ff;">
+    <div class="manifesto-box" style="border-left-color: #ff007f;">
         <div class="manifesto-title">🛠️ THE SAMRION ARMORY</div>
         <div class="manifesto-text">
             <b>1. 🧠 MEDHA (The Brain)</b><br>
@@ -198,20 +228,31 @@ def get_groq():
     try: return Groq(api_key=st.secrets["GROQ_API_KEY"])
     except: return None
 
-# DB Ops
-def get_user(k): 
+# --- DATABASE OPS (UPDATED FOR EDITING/NAMING) ---
+def get_user_data(k): 
     try: return db.reference(f"users/{k}").get() 
     except: return None
-def set_user(k, v): db.reference(f"users/{k}").set(v)
-def del_user(k): db.reference(f"users/{k}").delete()
+
+def create_user(key, name, tools): 
+    # Store as Object: { 'name': 'Nitin', 'tools': ['MEDHA', 'VANI'] }
+    db.reference(f"users/{key}").set({'name': name, 'tools': tools})
+
+def update_user_tools(key, tools):
+    db.reference(f"users/{key}/tools").set(tools)
+
+def delete_user(k): db.reference(f"users/{k}").delete()
+
 def get_all_users(): return db.reference("users").get()
+
 def add_req(em): db.reference('requests').push({"email": em, "date": str(datetime.date.today())})
 def get_reqs(): return db.reference('requests').get() or {}
 def del_req(k): db.reference(f'requests/{k}').delete()
+
 def add_upgrade(u, t, utr): db.reference('upgrades').push({"user": u, "tool": t, "utr": utr})
 def get_upgrades(): return db.reference('upgrades').get() or {}
 def del_upgrade(k): db.reference(f'upgrades/{k}').delete()
-def add_donation(e, u, a): db.reference('donations').push({"email": e, "utr": u, "amt": a})
+
+def add_donation(e, u, a): db.reference('donations').push({"email": e, "utr": u, "amt": a, "date": str(datetime.date.today())})
 def get_donations(): return db.reference('donations').get() or {}
 
 def gen_key(): return "".join(random.choices(string.ascii_uppercase + string.digits, k=12))
@@ -221,14 +262,14 @@ def gen_key(): return "".join(random.choices(string.ascii_uppercase + string.dig
 # =========================================================
 if "page" not in st.session_state: st.session_state.page = "home"
 if "role" not in st.session_state: st.session_state.role = None
-if "tools" not in st.session_state: st.session_state.tools = []
-if "user_pass" not in st.session_state: st.session_state.user_pass = None
+if "user_data" not in st.session_state: st.session_state.user_data = {}
+if "user_key" not in st.session_state: st.session_state.user_key = None
 
 def go(p): st.session_state.page = p
 def logout():
     st.session_state.role = None
-    st.session_state.tools = []
-    st.session_state.user_pass = None
+    st.session_state.user_data = {}
+    st.session_state.user_key = None
     go("home")
 
 TOOLS = {
@@ -247,16 +288,16 @@ ALL_TOOLS = list(TOOLS.keys())
 # --- HOME ---
 if st.session_state.page == "home":
     st.markdown("""
-    <div style="text-align:center; padding: 60px 20px;">
-        <h1 style="font-size: 4rem; background: -webkit-linear-gradient(#00d2ff, #ff007f); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">SAMRION TECHNOLOGIES</h1>
-        <h3 style="letter-spacing: 4px; color: #ccc;">THE FUTURE OF INTELLIGENCE</h3>
-        <p style="opacity:0.8; margin-top: 20px;">BUILT IN INDIA · OPEN SOURCE · INDIGENOUS</p>
+    <div style="text-align:center; padding: 80px 20px;">
+        <h1 style="font-size: 4.5rem; text-shadow: 0 0 20px #00d2ff; margin-bottom: 10px;">SAMRION TECHNOLOGIES</h1>
+        <h3 style="letter-spacing: 5px; color: #aaa;">THE FUTURE OF INTELLIGENCE</h3>
+        <p style="opacity:0.9; margin-top: 30px; font-size: 1.2rem;">BUILT IN INDIA · OPEN SOURCE · INDIGENOUS</p>
     </div>
     """, unsafe_allow_html=True)
     
     c1, c2, c3 = st.columns([1,1,1])
     with c1: 
-        if st.button("📖 MANIFESTO", use_container_width=True): go("about"); st.rerun()
+        if st.button("📖 READ MANIFESTO", use_container_width=True): go("about"); st.rerun()
     with c2: 
         if st.button("🔐 ENTER BRIDGE", use_container_width=True): go("login"); st.rerun()
     with c3: 
@@ -276,7 +317,7 @@ elif st.session_state.page == "donate":
     with c1:
         st.markdown("<div class='glass'><h3>🚀 Support The Mission</h3><p style='font-size:18px'>Funds go directly to GPU compute.<br><b>₹50 = Lifetime Access</b></p></div>", unsafe_allow_html=True)
         try: st.image("qr.png", width=350)
-        except: st.warning("Please upload qr.png to your folder")
+        except: st.warning("Please upload qr.png")
     with c2:
         st.markdown("<div class='glass'><h3>LOG CONTRIBUTION</h3>", unsafe_allow_html=True)
         email = st.text_input("Your Email Address")
@@ -302,11 +343,19 @@ elif st.session_state.page == "login":
                 st.session_state.role = "admin"
                 go("admin"); st.rerun()
             else:
-                u = get_user(key)
-                if u is not None:
+                u_data = get_user_data(key)
+                if u_data:
+                    # Handle both old list format and new dict format
+                    if isinstance(u_data, list): 
+                        u_tools = u_data
+                        u_name = "Unknown"
+                    else:
+                        u_tools = u_data.get('tools', [])
+                        u_name = u_data.get('name', 'Unknown')
+                        
                     st.session_state.role = "user"
-                    st.session_state.user_pass = key
-                    st.session_state.tools = u
+                    st.session_state.user_key = key
+                    st.session_state.user_data = {'name': u_name, 'tools': u_tools}
                     go("hub"); st.rerun()
                 else:
                     st.error("INVALID KEY")
@@ -314,7 +363,6 @@ elif st.session_state.page == "login":
         st.markdown("</div>", unsafe_allow_html=True)
         
         if st.session_state.get('show_req'):
-            st.warning("No Key Found.")
             em = st.text_input("Enter Email to Request Key")
             if st.button("SEND REQUEST"):
                 add_req(em)
@@ -322,13 +370,14 @@ elif st.session_state.page == "login":
     
     if st.button("← BACK"): go("home"); st.rerun()
 
-# --- HUB (FIXED) ---
+# --- HUB (FIXED LAUNCH BUTTONS) ---
 elif st.session_state.page == "hub":
     st.markdown("## 💠 SAMRION ARMORY")
+    st.caption(f"WELCOME, {st.session_state.user_data.get('name', 'USER').upper()}")
     if st.button("LOGOUT"): logout(); st.rerun()
     st.markdown("---")
     
-    my_tools = st.session_state.tools
+    my_tools = st.session_state.user_data.get('tools', [])
     cols = st.columns(3)
     
     for i, (name, (icon, url)) in enumerate(TOOLS.items()):
@@ -336,26 +385,27 @@ elif st.session_state.page == "hub":
         cls = "glass" if unlocked else "glass locked"
         
         with cols[i % 3]:
+            # Clean Card
             st.markdown(f"""
             <div class="{cls}" style="text-align:center">
-                <div style="font-size:4rem">{icon}</div>
-                <h3>{name}</h3>
+                <div style="font-size:4rem; margin-bottom:10px;">{icon}</div>
+                <h3 style="color:white;">{name}</h3>
             </div>
             """, unsafe_allow_html=True)
             
-            # THE FIX: NATIVE HTML BUTTON
+            # THE FIX: NATIVE HTML BUTTON (Blue/Pink Gradient)
             if unlocked:
                 st.markdown(f"""
-                    <a href="{url}" target="_blank" class="launch-btn">🚀 LAUNCH {name}</a>
+                    <a href="{url}" target="_blank" class="custom-btn">🚀 LAUNCH {name}</a>
                 """, unsafe_allow_html=True)
             else:
                 with st.expander("🔒 UNLOCK (₹10)"):
                     utr = st.text_input("UTR", key=f"u{i}")
                     if st.button("REQ UNLOCK", key=f"b{i}"):
-                        add_upgrade(st.session_state.user_pass, name, utr)
+                        add_upgrade(st.session_state.user_key, name, utr)
                         st.success("Sent")
 
-# --- ADMIN (FIXED LIST) ---
+# --- ADMIN (FIXED EDIT/DELETE/NAME) ---
 elif st.session_state.page == "admin":
     st.title("👑 FOUNDER CONSOLE")
     if st.button("EXIT"): logout(); st.rerun()
@@ -363,46 +413,77 @@ elif st.session_state.page == "admin":
     t1, t2, t3 = st.tabs(["USERS & KEYS", "REQUESTS", "FINANCE"])
     
     with t1:
-        c1, c2 = st.columns(2)
-        with c1:
-            st.markdown("### Mint New Key")
-            sel = st.multiselect("Select Tools", ALL_TOOLS, default=ALL_TOOLS)
-            if st.button("GENERATE KEY"):
+        # MINT NEW KEY
+        st.markdown("### ✨ Mint New Key")
+        c_gen1, c_gen2 = st.columns(2)
+        with c_gen1:
+            new_name = st.text_input("User Name / Alias", placeholder="e.g. Nitin Raj")
+        with c_gen2:
+            new_tools = st.multiselect("Grant Access", ALL_TOOLS, default=ALL_TOOLS)
+            
+        if st.button("GENERATE KEY"):
+            if new_name:
                 k = gen_key()
-                set_user(k, sel)
-                st.success(f"KEY GENERATED: {k}"); st.code(k)
-        
-        with c2:
-            st.markdown("### User Database")
-            users = get_all_users()
-            if users:
-                for k, v in users.items():
-                    # Custom HTML for readable list
-                    st.markdown(f"""
-                    <div class="admin-item">
-                        <div>
-                            <span style="color:#00d2ff; font-weight:bold;">{k}</span><br>
-                            <small style="color:#aaa;">{v}</small>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    if st.button(f"🗑️ DELETE {k}", key=f"del_{k}"):
-                        del_user(k)
-                        st.rerun()
+                create_user(key=k, name=new_name, tools=new_tools)
+                st.success(f"CREATED: {k} for {new_name}"); st.code(k)
             else:
-                st.info("No users found.")
+                st.error("Enter a name.")
+        
+        st.markdown("---")
+        st.markdown("### 👥 Active Database")
+        
+        users = get_all_users()
+        if users:
+            for k, v in users.items():
+                # Handle old data format vs new
+                if isinstance(v, list):
+                    u_name = "Unknown"
+                    u_tools = v
+                else:
+                    u_name = v.get('name', 'Unknown')
+                    u_tools = v.get('tools', [])
+
+                # ROW FOR EACH USER
+                st.markdown(f"""
+                <div class="admin-item">
+                    <div>
+                        <span style="color:#00d2ff; font-size:18px; font-weight:bold;">{u_name}</span> 
+                        <span style="color:#666; margin-left:10px;">({k})</span><br>
+                        <small style="color:#ccc;">ACCESS: {', '.join(u_tools)}</small>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                c_edit, c_del = st.columns([4, 1])
+                with c_edit:
+                    # EDIT TOOLS LOGIC
+                    with st.expander(f"✏️ EDIT TOOLS ({u_name})"):
+                        updated_tools = st.multiselect("Modify Access", ALL_TOOLS, default=u_tools, key=f"edit_{k}")
+                        if st.button("UPDATE ACCESS", key=f"save_{k}"):
+                            update_user_tools(k, updated_tools)
+                            st.success("Updated!")
+                            time.sleep(1); st.rerun()
+                with c_del:
+                    # DELETE LOGIC
+                    if st.button("🗑️ DELETE", key=f"del_{k}"):
+                        delete_user(k)
+                        st.error(f"Deleted {u_name}")
+                        time.sleep(1); st.rerun()
+        else:
+            st.info("No users found.")
 
     with t2:
         c1, c2 = st.columns(2)
         with c1:
-            st.markdown("#### Access Requests")
+            st.markdown("#### New Access Requests")
             reqs = get_reqs()
             for k, v in reqs.items():
                 with st.expander(v['email']):
+                    grant_name = st.text_input("Name", value="New User", key=f"nm{k}")
                     sel = st.multiselect("Grant", ALL_TOOLS, default=ALL_TOOLS, key=f"g{k}")
                     if st.button("CREATE", key=f"c{k}"):
                         nk = gen_key()
-                        set_user(nk, sel)
+                        create_user(nk, grant_name, sel)
                         del_req(k)
                         st.success(f"Key: {nk}")
         with c2:
@@ -411,24 +492,27 @@ elif st.session_state.page == "admin":
             for k, v in upgs.items():
                 with st.expander(f"{v['tool']} | UTR: {v['utr']}"):
                     if st.button("APPROVE", key=f"a{k}"):
-                        curr = get_user(v['user']) or []
-                        if v['tool'] not in curr: curr.append(v['tool'])
-                        set_user(v['user'], curr)
-                        del_upgrade(k)
-                        st.success("Done")
-                        time.sleep(1); st.rerun()
+                        # Fetch current data
+                        curr_data = get_user_data(v['user'])
+                        if curr_data:
+                            # Handle structure
+                            if isinstance(curr_data, list): tools = curr_data
+                            else: tools = curr_data.get('tools', [])
+                            
+                            if v['tool'] not in tools: tools.append(v['tool'])
+                            
+                            # Save back
+                            update_user_tools(v['user'], tools)
+                            del_upgrade(k)
+                            st.success("Upgraded!")
+                            time.sleep(1); st.rerun()
 
     with t3:
         st.markdown("#### 💰 Donation Logs")
         dons = get_donations()
         if dons:
             for k, v in dons.items():
-                st.markdown(f"""
-                <div class="glass" style="padding:10px;">
-                    <b>{v.get('email')}</b><br>
-                    UTR: {v.get('utr')} | Amt: ₹{v.get('amt')}
-                </div>
-                """, unsafe_allow_html=True)
+                st.code(f"DATE: {v.get('date')} | Email: {v.get('email')} | UTR: {v.get('utr')} | ₹{v.get('amt')}")
         else: st.info("No donations yet")
 
 else:
