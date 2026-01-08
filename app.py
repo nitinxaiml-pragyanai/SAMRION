@@ -572,7 +572,7 @@ def render_logo():
     try:
         st.markdown("""
         <div class="logo-container">
-            <img src="app/logo.png" alt="SAMRION Logo" />
+            <img src="logo.png" alt="SAMRION Logo" />
         </div>
         """, unsafe_allow_html=True)
     except Exception:
