@@ -247,7 +247,7 @@ def load_custom_css():
 
     /* Streamlit Button Override */
     div.stButton > button {
-        background: #111111;
+        background: #46494A;
         color: white;
         border: 2px solid #00d2ff;
         border-radius: 30px;
@@ -814,7 +814,7 @@ def render_hub_page():
     """Render user hub"""
     user_name = st.session_state.user_data.get('name', 'USER').upper()
     
-    st.markdown(f"## 💠 SAMRION ARMORY")
+    st.markdown(f"## 💠 TOOLS")
     st.caption(f"WELCOME, {user_name}")
     
     col1, col2 = st.columns([5, 1])
